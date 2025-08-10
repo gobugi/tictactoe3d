@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Tic-Tac-Toe Cube</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            z-index: 100;
+        }
+        
+        .player-info {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .player-active {
+            border: 2px solid #FFD500;
+        }
+        
+        .color-preview {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border: 2px solid #333;
+            vertical-align: middle;
+        }
+        
+        #center-cube-btn {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #FFD500;
+            color: #FFD500;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        #center-cube-btn:hover {
+            background: rgba(255, 213, 0, 0.2);
+            transform: scale(1.05);
+        }
+        
+        #center-cube-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .center-claimed {
+            border-color: #666 !important;
+            color: #666 !important;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="ui">
+            <div id="player1" class="player-info player-active">
+                <span class="color-preview" style="background-color: #B90000;"></span>
+                Player 1 (Red)
+            </div>
+            <div id="player2" class="player-info">
+                <span class="color-preview" style="background-color: #0045AD;"></span>
+                Player 2 (Blue)
+            </div>
+            
+            <button id="center-cube-btn">
+                🎯 Claim Center Cube
+            </button>
+        </div>
+        
+        <div id="instructions">
+            <h3>How to Play:</h3>
+            <p>Click on any white cube face to claim it for your color. Use the "Claim Center Cube" button for the hidden cube in the middle. Get 3 in a row horizontally, vertically, or diagonally on any face, or through the center to win!</p>
+        </div>
+    </div>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.179.1/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.179.1/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
