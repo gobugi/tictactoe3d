@@ -13,6 +13,7 @@ const COLORS = {
 let currentPlayer = 1; // 1 for red, 2 for blue
 let gameBoard = new Array(27).fill(0); // 3x3x3 = 27 positions
 let gameEnded = false;
+let firstMoveMade = false;
 
 // Three.js setup
 let scene, camera, renderer, cubeGroup;
@@ -431,6 +432,16 @@ function claimCube(cube) {
         sticker.material.color.setHex(playerColor);
     });
     
+    // Fade out instructions after first move
+    if (!firstMoveMade) {
+        firstMoveMade = true;
+        const instructions = document.getElementById('instructions');
+        instructions.classList.add('fade-out');
+        setTimeout(() => {
+            instructions.style.display = 'none';
+        }, 800);
+    }
+    
     // Check for win
     if (checkWin()) {
         endGame(currentPlayer);
@@ -500,13 +511,23 @@ function checkWin() {
 function endGame(winner) {
     gameEnded = true;
     
-    const message = winner === 0 
-        ? "It's a draw!" 
-        : `Player ${winner} (${winner === 1 ? 'Red' : 'Blue'}) wins!`;
+    const modal = document.getElementById('game-modal');
+    const modalTitle = document.getElementById('modal-title');
+    
+    if (winner === 0) {
+        modalTitle.textContent = "Draw";
+        modalTitle.style.color = '#FFD500';
+    } else if (winner === 1) {
+        modalTitle.textContent = "Red Wins";
+        modalTitle.style.color = '#FF4444';
+    } else {
+        modalTitle.textContent = "Blue Wins";
+        modalTitle.style.color = '#4444FF';
+    }
     
     setTimeout(() => {
-        alert(message + '\n\nRefresh the page to play again.');
-    }, 100);
+        modal.classList.add('show');
+    }, 500);
 }
 
 function updateUI() {

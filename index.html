@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Tic-Tac-Toe Cube</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
             padding: 0;
-            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            background: #FFFFFF;
             font-family: 'Arial', sans-serif;
             overflow: hidden;
         }
@@ -87,6 +88,89 @@
             border-radius: 10px;
             backdrop-filter: blur(10px);
             max-width: 300px;
+            opacity: 1;
+            transition: opacity 0.8s ease-out;
+        }
+        
+        #instructions.fade-out {
+            opacity: 0;
+        }
+        
+        #game-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: modalFadeIn 0.5s ease-out;
+        }
+        
+        #game-modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px 60px;
+            border-radius: 20px;
+            text-align: center;
+            border: 3px solid #FFD500;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 50px rgba(255, 213, 0, 0.5);
+        }
+        
+        .modal-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 3rem;
+            font-weight: 900;
+            color: #FFD500;
+            margin: 0;
+            text-shadow: 0 0 20px rgba(255, 213, 0, 0.8);
+            letter-spacing: 2px;
+        }
+        
+        .modal-subtitle {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.2rem;
+            color: white;
+            margin: 20px 0 30px 0;
+            font-weight: 400;
+        }
+        
+        .modal-button {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(45deg, #FFD500, #FFA500);
+            border: none;
+            color: black;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .modal-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(255, 213, 0, 0.4);
+        }
+        
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
     </style>
 </head>
@@ -110,6 +194,14 @@
         <div id="instructions">
             <h3>How to Play:</h3>
             <p>Click on any white cube face to claim it for your color. Use the "Claim Center Cube" button for the hidden cube in the middle. Get 3 in a row horizontally, vertically, or diagonally on any face, or through the center to win!</p>
+        </div>
+    </div>
+    
+    <div id="game-modal">
+        <div class="modal-content">
+            <h1 class="modal-title" id="modal-title">Red Wins</h1>
+            <p class="modal-subtitle">Congratulations!</p>
+            <button class="modal-button" onclick="location.reload()">Play Again</button>
         </div>
     </div>
     
