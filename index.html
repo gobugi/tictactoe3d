@@ -6,6 +6,15 @@
     <title>3D Tic-Tac-Toe Cube</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
+        @font-face {
+            font-family: 'KarmaticArcade';
+            src: url('./fonts/KarmaticArcade-6Yrp1.ttf') format('truetype');
+        }
+        
+        @font-face {
+            font-family: 'PressStart2P';
+            src: url('./fonts/PressStart2P-vaV7.ttf') format('truetype');
+        }
         body {
             margin: 0;
             padding: 0;
@@ -22,22 +31,34 @@
         
         #ui {
             position: absolute;
-            top: 20px;
+            top: 100px;
             left: 20px;
             color: white;
             z-index: 100;
         }
         
+        #ui-right {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            color: white;
+            z-index: 100;
+        }
+        
         .player-info {
-            background: rgba(0, 0, 0, 0.7);
+            /* background: rgba(0, 0, 0, 0.7); */
             padding: 15px;
+            border: 2px;
             border-radius: 10px;
-            margin-bottom: 10px;
             backdrop-filter: blur(10px);
+            font-family: 'PressStart2P', monospace;
+            font-size: 1.2rem;
+            margin-top: 20px;
+            text-transform: uppercase;
         }
         
         .player-active {
-            border: 2px solid #FFD500;
+            font-weight: bold;
         }
         
         .color-preview {
@@ -49,33 +70,26 @@
             vertical-align: middle;
         }
         
-        #center-cube-btn {
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #FFD500;
-            color: #FFD500;
-            padding: 10px 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-            margin-top: 10px;
+        .center-cube-container {
+            width: 80px;
+            height: 80px;
+            position: relative;
         }
         
-        #center-cube-btn:hover {
-            background: rgba(255, 213, 0, 0.2);
-            transform: scale(1.05);
+        #center-cube-container-2 {
+            margin-left: auto;
         }
         
-        #center-cube-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .center-claimed {
-            border-color: #666 !important;
-            color: #666 !important;
+        #game-title {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: black;
+            font-family: 'KarmaticArcade', monospace;
+            font-size: 2.5rem;
+            z-index: 100;
+            letter-spacing: 3px;
         }
         
         #instructions {
@@ -96,99 +110,56 @@
             opacity: 0;
         }
         
-        #game-modal {
+        #win-message {
+            position: absolute;
+            top: 200px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'PressStart2P', monospace;
+            font-size: 1.5rem;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+        
+        #win-message.show {
+            opacity: 1;
+        }
+        
+        #background-glow {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(0, 0, 0, 0.8);
+            z-index: -10;
             display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            animation: modalFadeIn 0.5s ease-out;
-        }
-        
-        #game-modal.show {
-            display: flex;
-        }
-        
-        .modal-content {
-            background: rgba(0, 0, 0, 0.9);
-            padding: 40px 60px;
-            border-radius: 20px;
-            text-align: center;
-            border: 3px solid #FFD500;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 0 50px rgba(255, 213, 0, 0.5);
-        }
-        
-        .modal-title {
-            font-family: 'Orbitron', monospace;
-            font-size: 3rem;
-            font-weight: 900;
-            color: #FFD500;
-            margin: 0;
-            text-shadow: 0 0 20px rgba(255, 213, 0, 0.8);
-            letter-spacing: 2px;
-        }
-        
-        .modal-subtitle {
-            font-family: 'Orbitron', monospace;
-            font-size: 1.2rem;
-            color: white;
-            margin: 20px 0 30px 0;
-            font-weight: 400;
-        }
-        
-        .modal-button {
-            font-family: 'Orbitron', monospace;
-            background: linear-gradient(45deg, #FFD500, #FFA500);
-            border: none;
-            color: black;
-            padding: 15px 30px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .modal-button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(255, 213, 0, 0.4);
-        }
-        
-        @keyframes modalFadeIn {
-            from {
-                opacity: 0;
-                transform: scale(0.8);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
+            pointer-events: none;
+            opacity: 0.8;
         }
     </style>
 </head>
 <body>
+    <div id="background-glow"></div>
+    
+    <div id="game-title">TIC TAC TOE 3D</div>
+    <div id="win-message"></div>
+    
     <div id="container">
         <div id="ui">
-            <div id="player1" class="player-info player-active">
-                <span class="color-preview" style="background-color: #B90000;"></span>
-                Player 1 (Red)
-            </div>
-            <div id="player2" class="player-info">
-                <span class="color-preview" style="background-color: #0045AD;"></span>
-                Player 2 (Blue)
+            <div id="player1" class="player-info player-active" style="color: #FF0000;">
+                Player 1
             </div>
             
-            <button id="center-cube-btn">
-                🎯 Claim Center Cube
-            </button>
+            <div id="center-cube-container-1" class="center-cube-container"></div>
+        </div>
+        
+        <div id="ui-right">
+            <div id="player2" class="player-info" style="color: #0000FF;">
+                Player 2
+            </div>
+            
+            <div id="center-cube-container-2" class="center-cube-container"></div>
         </div>
         
         <div id="instructions">
@@ -197,13 +168,6 @@
         </div>
     </div>
     
-    <div id="game-modal">
-        <div class="modal-content">
-            <h1 class="modal-title" id="modal-title">Red Wins</h1>
-            <p class="modal-subtitle">Congratulations!</p>
-            <button class="modal-button" onclick="location.reload()">Play Again</button>
-        </div>
-    </div>
     
     <script type="importmap">
     {

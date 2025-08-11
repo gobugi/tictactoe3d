@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const COLORS = {
     WHITE: 0xFFFFFF,
     RED: 0xFF0000,
-    BLUE: 0x0000BB,
+    BLUE: 0x0000FF,
     BLACK: 0x000000
 };
 
@@ -23,26 +23,48 @@ let mouse = new THREE.Vector2();
 let controls;
 let centerAura = null; // For the center cube aura effect
 
+// Center cube button replacement - now with two cubes
+let centerCubes = {
+    player1: {
+        scene: null,
+        camera: null,
+        renderer: null,
+        group: null,
+        inner: null,
+        outer: null
+    },
+    player2: {
+        scene: null,
+        camera: null,
+        renderer: null,
+        group: null,
+        inner: null,
+        outer: null
+    }
+};
+let isFadingOut = false;
+
 // Click detection variables
 let mouseDownTime = 0;
 let mouseDownPosition = new THREE.Vector2();
 let isDragging = false;
 
 function init() {
-    // Create scene
+    // Create scene with transparent background
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xFFFFFF);
+    // Remove scene background to allow HTML background to show through
     
     // Create camera
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
     
-    // Create renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Create renderer with transparent background
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setClearColor(0x000000, 0); // Transparent background
     document.getElementById('container').appendChild(renderer.domElement);
     
     // Add lights
@@ -60,19 +82,21 @@ function init() {
     controls.maxDistance = 10;
     controls.maxPolarAngle = Math.PI;
     
+    // Create both center cube 3D buttons
+    createCenterCubeButtons();
+    
     // Add event listeners
     window.addEventListener('resize', onWindowResize);
     renderer.domElement.addEventListener('mousedown', onMouseDown);
     renderer.domElement.addEventListener('mousemove', onMouseMove);
     renderer.domElement.addEventListener('mouseup', onMouseUp);
-    document.getElementById('center-cube-btn').addEventListener('click', onCenterCubeClick);
     
     // Start animation loop
     animate();
     
     // Initialize UI to show current player
     updateUI();
-    updateCenterButton();
+    updateCenterCubeButtons();
 }
 
 function setupLighting() {
@@ -359,7 +383,7 @@ function handleCubeClick(event) {
 }
 
 function onCenterCubeClick() {
-    if (gameEnded) return;
+    if (gameEnded || isFadingOut) return;
     
     const centerCubeIndex = 13; // Center cube in 3x3x3 grid (position [1,1,1])
     
@@ -369,15 +393,103 @@ function onCenterCubeClick() {
     // Get the current player's color before claiming (since claimCube switches players)
     const playerColor = currentPlayer === 1 ? COLORS.RED : COLORS.BLUE;
     
-    // Claim the center cube
-    const centerCube = cubePieces[centerCubeIndex];
-    claimCube(centerCube);
+    // Start fade animations
+    startFadeAnimations(playerColor, centerCubeIndex);
+}
+
+function startFadeAnimations(playerColor, centerCubeIndex) {
+    isFadingOut = true;
+    const fadeDuration = 1000; // 1 second
+    const startTime = Date.now();
     
-    // Create colored aura behind the cube
-    createCenterAura(playerColor);
+    // Start background glow fade-in
+    fadeInBackgroundGlow(playerColor, fadeDuration);
     
-    // Update button UI to show it's been claimed
-    updateCenterButton();
+    // Start cube fade-out for both cubes
+    fadeOutCenterCubes(fadeDuration, () => {
+        // Callback when fade is complete
+        const centerCube = cubePieces[centerCubeIndex];
+        claimCube(centerCube);
+        updateCenterCubeButtons();
+    });
+}
+
+function fadeInBackgroundGlow(playerColor, duration) {
+    const backgroundGlow = document.getElementById('background-glow');
+    if (!backgroundGlow) return;
+    
+    const colorHex = playerColor === COLORS.RED ? '#ff0000' : '#0000ff';
+    const startTime = Date.now();
+    
+    // Show element immediately but fully transparent
+    backgroundGlow.style.background = `radial-gradient(circle at center, ${colorHex} 0%, ${colorHex}aa 15%, ${colorHex}66 30%, ${colorHex}33 45%, transparent 60%)`;
+    backgroundGlow.style.display = 'block';
+    backgroundGlow.style.opacity = '0';
+    
+    function animate() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease-in-out for smooth animation
+        const easeProgress = 0.5 * (1 - Math.cos(Math.PI * progress));
+        backgroundGlow.style.opacity = (0.8 * easeProgress).toString();
+        
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
+    }
+    
+    requestAnimationFrame(animate);
+}
+
+function fadeOutCenterCubes(duration, callback) {
+    const startTime = Date.now();
+    const startOpacity = 1;
+    
+    // Set all materials to transparent mode at start for both cubes
+    Object.values(centerCubes).forEach(cube => {
+        if (cube.group) {
+            cube.group.children.forEach(child => {
+                if (child.material) {
+                    child.material.transparent = true;
+                    child.material.opacity = 1;
+                    child.material.needsUpdate = true;
+                }
+            });
+        }
+    });
+    
+    function animate() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease-in-out for smooth animation
+        const easeProgress = 0.5 * (1 - Math.cos(Math.PI * progress));
+        const opacity = startOpacity * (1 - easeProgress);
+        
+        // Update opacity for all children in both cubes
+        Object.values(centerCubes).forEach(cube => {
+            if (cube.group) {
+                cube.group.children.forEach(child => {
+                    if (child.material) {
+                        child.material.opacity = opacity;
+                        child.material.needsUpdate = true;
+                    }
+                });
+            }
+        });
+        
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            // Animation complete - hide both cube containers
+            document.getElementById('center-cube-container-1').style.display = 'none';
+            document.getElementById('center-cube-container-2').style.display = 'none';
+            callback();
+        }
+    }
+    
+    requestAnimationFrame(animate);
 }
 
 function createCenterAura(playerColor) {
@@ -386,37 +498,254 @@ function createCenterAura(playerColor) {
         scene.remove(centerAura);
     }
     
-    // Create a single smooth gradient sphere
-    const mistGeometry = new THREE.SphereGeometry(3.0, 32, 32);
+    // Show the background glow with appropriate color
+    const backgroundGlow = document.getElementById('background-glow');
+    if (backgroundGlow) {
+        const colorHex = playerColor === COLORS.RED ? '#ff0000' : '#0000ff';
+        backgroundGlow.style.background = `radial-gradient(circle at center, ${colorHex} 0%, ${colorHex}aa 15%, ${colorHex}66 30%, ${colorHex}33 45%, transparent 60%)`;
+        backgroundGlow.style.display = 'block';
+        console.log('Background glow applied:', colorHex, backgroundGlow.style.background);
+    } else {
+        console.log('Background glow element not found');
+    }
     
-    // Simple visible material with radial gradient
-    const mistMaterial = new THREE.MeshBasicMaterial({
-        color: playerColor,
-        transparent: true,
-        opacity: 0.05,
-        side: THREE.DoubleSide
-    });
-    
-    centerAura = new THREE.Mesh(mistGeometry, mistMaterial);
-    centerAura.renderOrder = -1;
-    scene.add(centerAura);
+    // Set centerAura to a placeholder to maintain compatibility
+    centerAura = { type: 'background-circle' };
 }
 
-function updateCenterButton() {
-    const centerBtn = document.getElementById('center-cube-btn');
+function createCenterCubeButtons() {
+    // Create both player cubes
+    createSingleCenterCube('player1', 'center-cube-container-1');
+    createSingleCenterCube('player2', 'center-cube-container-2');
+    
+    // Start animation for both cubes
+    animateCenterCubes();
+}
+
+function createSingleCenterCube(player, containerId) {
+    const cube = centerCubes[player];
+    
+    // Create separate scene for this cube
+    cube.scene = new THREE.Scene();
+    
+    // Create camera (orthographic for perfect cube appearance)
+    const frustumSize = 2;
+    cube.camera = new THREE.OrthographicCamera(
+        -frustumSize / 2, frustumSize / 2,  // left, right
+        frustumSize / 2, -frustumSize / 2,  // top, bottom
+        0.1, 100  // near, far
+    );
+    cube.camera.position.set(2, 2, 2);
+    cube.camera.lookAt(0, 0, 0);
+    
+    // Create renderer
+    cube.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    cube.renderer.setSize(80, 80);
+    cube.renderer.setClearColor(0x000000, 0);
+    
+    // Add lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    cube.scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(1, 1, 1);
+    cube.scene.add(directionalLight);
+    
+    // Create the cube group
+    cube.group = new THREE.Group();
+    cube.scene.add(cube.group);
+    
+    // Create outer wireframe cube
+    const outerGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const outerEdges = new THREE.EdgesGeometry(outerGeometry);
+    const outerMaterial = new THREE.LineBasicMaterial({ 
+        color: 0x000000, 
+        linewidth: 1,
+        transparent: true,
+        opacity: 1.0
+    });
+    cube.outer = new THREE.LineSegments(outerEdges, outerMaterial);
+    cube.group.add(cube.outer);
+    
+    // Create inner solid cube - Player 1 starts active (red), Player 2 starts inactive (gray)
+    const innerGeometry = new THREE.BoxGeometry(0.333, 0.333, 0.333);
+    const innerColor = (player === 'player1') ? COLORS.RED : 0x666666;
+    
+    const innerMaterial = new THREE.MeshPhongMaterial({ 
+        color: innerColor,
+        shininess: 30,
+        transparent: true,
+        opacity: 1
+    });
+    cube.inner = new THREE.Mesh(innerGeometry, innerMaterial);
+    cube.group.add(cube.inner);
+    
+    // Add black edges to inner cube
+    const innerEdges = new THREE.EdgesGeometry(innerGeometry);
+    const innerEdgeMaterial = new THREE.LineBasicMaterial({ 
+        color: 0x000000, 
+        linewidth: 1
+    });
+    const innerWireframe = new THREE.LineSegments(innerEdges, innerEdgeMaterial);
+    cube.group.add(innerWireframe);
+    
+    // Add to HTML container
+    const container = document.getElementById(containerId);
+    container.appendChild(cube.renderer.domElement);
+    
+    // Set initial clickability - Player 1 starts clickable, Player 2 starts unclickable
+    cube.renderer.domElement.addEventListener('click', onCenterCubeClick);
+    if (player === 'player1') {
+        cube.renderer.domElement.style.cursor = 'pointer';
+        cube.renderer.domElement.style.opacity = '1';
+        cube.renderer.domElement.style.pointerEvents = 'auto';
+    } else {
+        cube.renderer.domElement.style.cursor = 'not-allowed';
+        cube.renderer.domElement.style.opacity = '0.6';
+        cube.renderer.domElement.style.pointerEvents = 'none';
+    }
+}
+
+function animateCenterCubes() {
+    if (gameEnded) return;
+    
+    // Auto-rotate both cubes slowly
+    const time = Date.now() * 0.001;
+    
+    Object.values(centerCubes).forEach(cube => {
+        if (cube.group) {
+            cube.group.rotation.x = time * 0.3;
+            cube.group.rotation.y = time * 0.4;
+            cube.group.rotation.z = time * 0.2;
+        }
+        
+        // Render the cube
+        if (cube.renderer && cube.scene && cube.camera) {
+            cube.renderer.render(cube.scene, cube.camera);
+        }
+    });
+    
+    requestAnimationFrame(animateCenterCubes);
+}
+
+function updateCenterCubeButtons() {
     const centerCubeIndex = 13;
     
     if (gameBoard[centerCubeIndex] !== 0) {
-        const playerColor = gameBoard[centerCubeIndex] === 1 ? 'Red' : 'Blue';
-        centerBtn.textContent = `🔒 Center claimed by ${playerColor}`;
-        centerBtn.disabled = true;
-        centerBtn.classList.add('center-claimed');
+        // Center cube is claimed - make both gray and disable
+        Object.values(centerCubes).forEach(cube => {
+            if (cube.inner) {
+                cube.inner.material.color.setHex(0x666666);
+            }
+            if (cube.renderer && cube.renderer.domElement) {
+                cube.renderer.domElement.style.cursor = 'not-allowed';
+                cube.renderer.domElement.style.opacity = '0.5';
+            }
+        });
     } else {
-        const currentPlayerName = currentPlayer === 1 ? 'Red' : 'Blue';
-        centerBtn.textContent = `🎯 Claim Center Cube (${currentPlayerName})`;
-        centerBtn.disabled = false;
-        centerBtn.classList.remove('center-claimed');
+        // Update colors based on current player
+        updateCubeColors();
     }
+}
+
+function updateCubeColors() {
+    console.log('updateCubeColors called, currentPlayer:', currentPlayer);
+    
+    // Player 1 cube
+    if (centerCubes.player1.group) {
+        const isPlayer1Active = currentPlayer === 1;
+        
+        console.log('Player 1 - Active:', isPlayer1Active);
+        animateCubeTransition(centerCubes.player1, 'player1', isPlayer1Active);
+        
+        if (centerCubes.player1.renderer && centerCubes.player1.renderer.domElement) {
+            if (isPlayer1Active) {
+                centerCubes.player1.renderer.domElement.style.cursor = 'pointer';
+                centerCubes.player1.renderer.domElement.style.opacity = '1';
+                centerCubes.player1.renderer.domElement.style.pointerEvents = 'auto';
+            } else {
+                centerCubes.player1.renderer.domElement.style.cursor = 'not-allowed';
+                centerCubes.player1.renderer.domElement.style.opacity = '0.6';
+                centerCubes.player1.renderer.domElement.style.pointerEvents = 'none';
+            }
+        }
+    }
+    
+    // Player 2 cube
+    if (centerCubes.player2.group) {
+        const isPlayer2Active = currentPlayer === 2;
+        
+        console.log('Player 2 - Active:', isPlayer2Active);
+        animateCubeTransition(centerCubes.player2, 'player2', isPlayer2Active);
+        
+        if (centerCubes.player2.renderer && centerCubes.player2.renderer.domElement) {
+            if (isPlayer2Active) {
+                centerCubes.player2.renderer.domElement.style.cursor = 'pointer';
+                centerCubes.player2.renderer.domElement.style.opacity = '1';
+                centerCubes.player2.renderer.domElement.style.pointerEvents = 'auto';
+            } else {
+                centerCubes.player2.renderer.domElement.style.cursor = 'not-allowed';
+                centerCubes.player2.renderer.domElement.style.opacity = '0.6';
+                centerCubes.player2.renderer.domElement.style.pointerEvents = 'none';
+            }
+        }
+    }
+}
+
+function animateCubeTransition(cubeObj, player, isActive) {
+    const duration = 1000; // 1 second for smoother transition
+    const startTime = Date.now();
+    
+    // Determine target colors and opacity based on active state
+    const targetInnerColor = isActive ? (player === 'player1' ? COLORS.RED : COLORS.BLUE) : 0xffffff;
+    const targetInnerOpacity = isActive ? 1.0 : 0.3; // translucent when inactive
+    const targetBorderColor = isActive ? 0x000000 : 0x666666; // black when active, gray when inactive
+    
+    // Get starting values
+    const startInnerColor = cubeObj.inner.material.color.clone();
+    const startInnerOpacity = cubeObj.inner.material.opacity;
+    const startOuterColor = cubeObj.outer.material.color.clone();
+    const startInnerWireColor = cubeObj.group.children[2] ? cubeObj.group.children[2].material.color.clone() : null;
+    
+    // Target colors
+    const endInnerColor = new THREE.Color(targetInnerColor);
+    const endOuterColor = new THREE.Color(targetBorderColor);
+    const endInnerWireColor = new THREE.Color(targetBorderColor);
+    
+    function animate() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease-in-out for smooth animation
+        const easeProgress = 0.5 * (1 - Math.cos(Math.PI * progress));
+        
+        // Animate inner cube color and opacity
+        const currentInnerColor = startInnerColor.clone().lerp(endInnerColor, easeProgress);
+        const currentInnerOpacity = startInnerOpacity + (targetInnerOpacity - startInnerOpacity) * easeProgress;
+        
+        cubeObj.inner.material.color.copy(currentInnerColor);
+        cubeObj.inner.material.opacity = currentInnerOpacity;
+        cubeObj.inner.material.transparent = true;
+        cubeObj.inner.material.needsUpdate = true;
+        
+        // Animate outer wireframe color
+        const currentOuterColor = startOuterColor.clone().lerp(endOuterColor, easeProgress);
+        cubeObj.outer.material.color.copy(currentOuterColor);
+        cubeObj.outer.material.needsUpdate = true;
+        
+        // Animate inner wireframe color (if exists)
+        if (startInnerWireColor && cubeObj.group.children[2]) {
+            const currentInnerWireColor = startInnerWireColor.clone().lerp(endInnerWireColor, easeProgress);
+            cubeObj.group.children[2].material.color.copy(currentInnerWireColor);
+            cubeObj.group.children[2].material.needsUpdate = true;
+        }
+        
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
+    }
+    
+    requestAnimationFrame(animate);
 }
 
 function claimCube(cube) {
@@ -457,7 +786,7 @@ function claimCube(cube) {
     // Switch players
     currentPlayer = currentPlayer === 1 ? 2 : 1;
     updateUI();
-    updateCenterButton();
+    updateCenterCubeButtons();
 }
 
 function checkWin() {
@@ -511,22 +840,21 @@ function checkWin() {
 function endGame(winner) {
     gameEnded = true;
     
-    const modal = document.getElementById('game-modal');
-    const modalTitle = document.getElementById('modal-title');
+    const winMessage = document.getElementById('win-message');
     
     if (winner === 0) {
-        modalTitle.textContent = "Draw";
-        modalTitle.style.color = '#FFD500';
+        winMessage.textContent = "DRAW";
+        winMessage.style.color = '#000000';
     } else if (winner === 1) {
-        modalTitle.textContent = "Red Wins";
-        modalTitle.style.color = '#FF4444';
+        winMessage.textContent = "PLAYER 1 WINS!";
+        winMessage.style.color = '#FF0000';
     } else {
-        modalTitle.textContent = "Blue Wins";
-        modalTitle.style.color = '#4444FF';
+        winMessage.textContent = "PLAYER 2 WINS!";
+        winMessage.style.color = '#0000FF';
     }
     
     setTimeout(() => {
-        modal.classList.add('show');
+        winMessage.classList.add('show');
     }, 500);
 }
 
@@ -551,18 +879,7 @@ function animate() {
         controls.update();
     }
     
-    // Update aura position to follow center cube
-    if (centerAura && cubePieces[13]) {
-        const centerCube = cubePieces[13];
-        const worldPosition = new THREE.Vector3();
-        centerCube.getWorldPosition(worldPosition);
-        centerAura.position.copy(worldPosition);
-        
-        // Animate the mist with subtle rotation
-        const time = Date.now() * 0.001;
-        centerAura.rotation.y = time * 0.05;
-        centerAura.rotation.x = time * 0.03;
-    }
+    // No animation needed for background circle
     
     renderer.render(scene, camera);
 }
