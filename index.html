@@ -27,6 +27,7 @@
             width: 100vw;
             height: 100vh;
             position: relative;
+            top: -120px;
         }
         
         #ui {
@@ -80,11 +81,14 @@
             margin-left: auto;
         }
         
+        header {
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+        }
+
         #game-title {
-            position: absolute;
-            top: 50px;
-            left: 50%;
-            transform: translateX(-50%);
+            margin-top: 50px;
             color: black;
             font-family: 'KarmaticArcade', monospace;
             font-size: 2.5rem;
@@ -140,9 +144,11 @@
     </style>
 </head>
 <body>
+    <header>
+        <h1 id="game-title">TIC TAC TOE 3D</h1>
+    </header>
     <div id="background-glow"></div>
     
-    <div id="game-title">TIC TAC TOE 3D</div>
     <div id="win-message"></div>
     
     <div id="container">
