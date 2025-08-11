@@ -390,27 +390,66 @@ function onCenterCubeClick() {
     // Check if center cube is already claimed
     if (gameBoard[centerCubeIndex] !== 0) return;
     
-    // Get the current player's color before claiming (since claimCube switches players)
+    // Get the current player's color before claiming
     const playerColor = currentPlayer === 1 ? COLORS.RED : COLORS.BLUE;
     
-    // Start fade animations
-    startFadeAnimations(playerColor, centerCubeIndex);
+    // IMMEDIATELY claim the center cube for the current player
+    const centerCube = cubePieces[centerCubeIndex];
+    centerCube.userData.claimed = true;
+    gameBoard[centerCubeIndex] = currentPlayer;
+    
+    // Store the player who made this move before switching
+    const playerWhoMoved = currentPlayer;
+    
+    // Switch players immediately to prevent double moves
+    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    updateUI();
+    updateCenterCubeButtons();
+    
+    // Start fade animations (but cube is already claimed)
+    startFadeAnimations(playerColor, centerCubeIndex, playerWhoMoved);
 }
 
-function startFadeAnimations(playerColor, centerCubeIndex) {
+function startFadeAnimations(playerColor, centerCubeIndex, playerWhoMoved) {
     isFadingOut = true;
     const fadeDuration = 1000; // 1 second
-    const startTime = Date.now();
     
     // Start background glow fade-in
     fadeInBackgroundGlow(playerColor, fadeDuration);
     
     // Start cube fade-out for both cubes
     fadeOutCenterCubes(fadeDuration, () => {
-        // Callback when fade is complete
+        // Callback when fade is complete - cube already claimed above
         const centerCube = cubePieces[centerCubeIndex];
-        claimCube(centerCube);
-        updateCenterCubeButtons();
+        
+        // Change stickers to player color
+        centerCube.userData.stickers.forEach(sticker => {
+            sticker.material.color.setHex(playerColor);
+        });
+        
+        // Check for win using the player who just moved
+        const originalCurrentPlayer = currentPlayer;
+        currentPlayer = playerWhoMoved; // Temporarily switch to check win
+        
+        const winningPattern = checkWin();
+        if (centerCubeIndex === 13) {
+            console.log('CENTER CUBE CLAIMED! Player:', playerWhoMoved, 'GameBoard[13]:', gameBoard[13], 'Pattern found:', winningPattern);
+        }
+        if (winningPattern !== false) {
+            console.log('WIN DETECTED VIA CENTER CUBE! Pattern:', winningPattern, 'Player:', playerWhoMoved);
+            console.log('Calling endGame for center cube win...');
+            endGame(playerWhoMoved, winningPattern);
+            return;
+        }
+        
+        // Check for draw
+        if (gameBoard.every(cell => cell !== 0)) {
+            endGame(0); // Draw
+            return;
+        }
+        
+        // Restore current player
+        currentPlayer = originalCurrentPlayer;
     });
 }
 
@@ -422,7 +461,7 @@ function fadeInBackgroundGlow(playerColor, duration) {
     const startTime = Date.now();
     
     // Show element immediately but fully transparent
-    backgroundGlow.style.background = `radial-gradient(circle at center, ${colorHex} 0%, ${colorHex}aa 15%, ${colorHex}66 30%, ${colorHex}33 45%, transparent 60%)`;
+    backgroundGlow.style.background = `radial-gradient(circle at center, ${colorHex} 0%, ${colorHex}aa 8%, ${colorHex}66 16%, ${colorHex}33 24%, transparent 30%)`;
     backgroundGlow.style.display = 'block';
     backgroundGlow.style.opacity = '0';
     
@@ -502,7 +541,7 @@ function createCenterAura(playerColor) {
     const backgroundGlow = document.getElementById('background-glow');
     if (backgroundGlow) {
         const colorHex = playerColor === COLORS.RED ? '#ff0000' : '#0000ff';
-        backgroundGlow.style.background = `radial-gradient(circle at center, ${colorHex} 0%, ${colorHex}aa 15%, ${colorHex}66 30%, ${colorHex}33 45%, transparent 60%)`;
+        backgroundGlow.style.background = `radial-gradient(circle at center, ${colorHex} 0%, ${colorHex}aa 8%, ${colorHex}66 16%, ${colorHex}33 24%, transparent 30%)`;
         backgroundGlow.style.display = 'block';
         console.log('Background glow applied:', colorHex, backgroundGlow.style.background);
     } else {
@@ -748,6 +787,93 @@ function animateCubeTransition(cubeObj, player, isActive) {
     requestAnimationFrame(animate);
 }
 
+// Global variables for flashing state
+let flashState = {
+    active: false,
+    isYellow: true,
+    cycleStart: 0,
+    stickers: [],
+    backgroundGlow: null,
+    hasCenterCube: false,
+    playerColor: 0x000000
+};
+
+function startWinningFlash(winningPattern, playerColor) {
+    const FLASH_DURATION = 400; // Half cycle duration in ms
+    const YELLOW = 0xFFFF00;
+    
+    // Setup - collect all elements and stickers
+    flashState.active = true;
+    flashState.isYellow = true;
+    flashState.cycleStart = Date.now();
+    flashState.playerColor = playerColor;
+    flashState.hasCenterCube = winningPattern.includes(13);
+    flashState.backgroundGlow = document.getElementById('background-glow');
+    flashState.stickers = [];
+    
+    // Collect winning stickers
+    let patternIndex = 0;
+    while (patternIndex < winningPattern.length) {
+        const index = winningPattern[patternIndex];
+        const cube = cubePieces[index];
+        if (cube && cube.userData.stickers) {
+            let stickerIndex = 0;
+            while (stickerIndex < cube.userData.stickers.length) {
+                flashState.stickers.push(cube.userData.stickers[stickerIndex]);
+                stickerIndex++;
+            }
+        }
+        patternIndex++;
+    }
+    
+    // Perform initial flash update
+    const now = Date.now();
+    const elapsed = now - flashState.cycleStart;
+    const progress = Math.min(elapsed / FLASH_DURATION, 1);
+    const easeProgress = 0.5 * (1 - Math.cos(Math.PI * progress));
+    
+    // Calculate current color
+    const currentColorValue = flashState.isYellow ? YELLOW : playerColor;
+    const targetColorValue = flashState.isYellow ? playerColor : YELLOW;
+    const currentColor = new THREE.Color(currentColorValue);
+    const targetColor = new THREE.Color(targetColorValue);
+    const interpolatedColor = currentColor.clone();
+    interpolatedColor.r += (targetColor.r - currentColor.r) * easeProgress;
+    interpolatedColor.g += (targetColor.g - currentColor.g) * easeProgress;
+    interpolatedColor.b += (targetColor.b - currentColor.b) * easeProgress;
+    
+    // Update all stickers
+    let i = 0;
+    while (i < flashState.stickers.length) {
+        const sticker = flashState.stickers[i];
+        sticker.material.color.copy(interpolatedColor);
+        sticker.material.needsUpdate = true;
+        i++;
+    }
+    
+    // Update ambient light if center cube involved
+    if (flashState.hasCenterCube && flashState.backgroundGlow && flashState.backgroundGlow.style.display !== 'none') {
+        const r = Math.round(interpolatedColor.r * 255);
+        let rHex = r.toString(16);
+        if (rHex.length < 2) rHex = '0' + rHex;
+        const g = Math.round(interpolatedColor.g * 255);
+        let gHex = g.toString(16);
+        if (gHex.length < 2) gHex = '0' + gHex;
+        const b = Math.round(interpolatedColor.b * 255);
+        let bHex = b.toString(16);
+        if (bHex.length < 2) bHex = '0' + bHex;
+        const hex = '#' + rHex + gHex + bHex;
+        const gradientStr = 'radial-gradient(circle at center, ' + hex + ' 0%, ' + hex + 'aa 8%, ' + hex + '66 16%, ' + hex + '33 24%, transparent 30%)';
+        flashState.backgroundGlow.style.background = gradientStr;
+    }
+    
+    // Check if cycle complete and update state for next call
+    if (progress >= 1) {
+        flashState.isYellow = !flashState.isYellow;
+        flashState.cycleStart = Date.now();
+    }
+}
+
 function claimCube(cube) {
     const cubeIndex = cube.userData.index;
     const playerColor = currentPlayer === 1 ? COLORS.RED : COLORS.BLUE;
@@ -772,8 +898,13 @@ function claimCube(cube) {
     }
     
     // Check for win
-    if (checkWin()) {
-        endGame(currentPlayer);
+    const winningPattern = checkWin();
+    if (cubeIndex === 13) {
+        console.log('CENTER CUBE CLAIMED! Player:', currentPlayer, 'GameBoard[13]:', gameBoard[13], 'Pattern found:', winningPattern);
+    }
+    if (winningPattern !== false) {
+        console.log('WIN DETECTED! Pattern:', winningPattern, 'Player:', currentPlayer);
+        endGame(currentPlayer, winningPattern);
         return;
     }
     
@@ -829,28 +960,46 @@ function checkWin() {
     ];
     
     for (const pattern of winPatterns) {
+        if (pattern.includes(13)) {
+            console.log('Checking pattern with center:', pattern, 'Values:', pattern.map(i => `${i}:${gameBoard[i]}`), 'CurrentPlayer:', currentPlayer);
+        }
         if (pattern.every(index => gameBoard[index] === currentPlayer)) {
-            return true;
+            console.log('WINNING PATTERN FOUND:', pattern);
+            return pattern;
         }
     }
     
+    console.log('No winning pattern found');
     return false;
 }
 
-function endGame(winner) {
+function endGame(winner, winningPattern = null) {
+    console.log('endGame called - Winner:', winner, 'Pattern:', winningPattern, 'gameEnded before:', gameEnded);
     gameEnded = true;
     
     const winMessage = document.getElementById('win-message');
+    console.log('Win message element found:', !!winMessage);
     
     if (winner === 0) {
         winMessage.textContent = "DRAW";
         winMessage.style.color = '#000000';
+        // No flashing for draws
     } else if (winner === 1) {
         winMessage.textContent = "PLAYER 1 WINS!";
         winMessage.style.color = '#FF0000';
+        
+        // Start flashing animations for winning pattern
+        if (winningPattern) {
+            startWinningFlash(winningPattern, COLORS.RED);
+        }
     } else {
         winMessage.textContent = "PLAYER 2 WINS!";
         winMessage.style.color = '#0000FF';
+        
+        // Start flashing animations for winning pattern
+        if (winningPattern) {
+            startWinningFlash(winningPattern, COLORS.BLUE);
+        }
     }
     
     setTimeout(() => {
@@ -879,7 +1028,55 @@ function animate() {
         controls.update();
     }
     
-    // No animation needed for background circle
+    // Continue flashing animation if active
+    if (flashState.active && gameEnded) {
+        const FLASH_DURATION = 400;
+        const YELLOW = 0xFFFF00;
+        const now = Date.now();
+        const elapsed = now - flashState.cycleStart;
+        const progress = Math.min(elapsed / FLASH_DURATION, 1);
+        const easeProgress = 0.5 * (1 - Math.cos(Math.PI * progress));
+        
+        const currentColorValue = flashState.isYellow ? YELLOW : flashState.playerColor;
+        const targetColorValue = flashState.isYellow ? flashState.playerColor : YELLOW;
+        const currentColor = new THREE.Color(currentColorValue);
+        const targetColor = new THREE.Color(targetColorValue);
+        const interpolatedColor = currentColor.clone();
+        interpolatedColor.r += (targetColor.r - currentColor.r) * easeProgress;
+        interpolatedColor.g += (targetColor.g - currentColor.g) * easeProgress;
+        interpolatedColor.b += (targetColor.b - currentColor.b) * easeProgress;
+        
+        // Update all stickers
+        let i = 0;
+        while (i < flashState.stickers.length) {
+            const sticker = flashState.stickers[i];
+            sticker.material.color.copy(interpolatedColor);
+            sticker.material.needsUpdate = true;
+            i++;
+        }
+        
+        // Update ambient light if center cube involved
+        if (flashState.hasCenterCube && flashState.backgroundGlow && flashState.backgroundGlow.style.display !== 'none') {
+            const r = Math.round(interpolatedColor.r * 255);
+            let rHex = r.toString(16);
+            if (rHex.length < 2) rHex = '0' + rHex;
+            const g = Math.round(interpolatedColor.g * 255);
+            let gHex = g.toString(16);
+            if (gHex.length < 2) gHex = '0' + gHex;
+            const b = Math.round(interpolatedColor.b * 255);
+            let bHex = b.toString(16);
+            if (bHex.length < 2) bHex = '0' + bHex;
+            const hex = '#' + rHex + gHex + bHex;
+            const gradientStr = 'radial-gradient(circle at center, ' + hex + ' 0%, ' + hex + 'aa 8%, ' + hex + '66 16%, ' + hex + '33 24%, transparent 30%)';
+            flashState.backgroundGlow.style.background = gradientStr;
+        }
+        
+        // Check if cycle complete
+        if (progress >= 1) {
+            flashState.isYellow = !flashState.isYellow;
+            flashState.cycleStart = Date.now();
+        }
+    }
     
     renderer.render(scene, camera);
 }
